@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="時間ログ">
+<title>時間ログ</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #fff; --card: #fff; --text: #1d1d1b; --sub: #77756f;
+    --line: #e6e6e3; --side: #2f6f5e; --learn: #c9822b; --other: #9a98a0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Hiragino Sans", sans-serif;
+    padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+    max-width: 480px; margin-inline: auto;
+  }
+  h1 { font-size: 20px; margin: 4px 0 2px; }
+  .range { color: var(--sub); font-size: 13px; margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 0 0 10px; }
+  .big { font-size: 32px; font-weight: 700; }
+  .big small { font-size: 14px; font-weight: 500; color: var(--sub); margin-left: 4px; }
+  .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin: 10px 0 6px; }
+  .bar > i { display: block; height: 100%; border-radius: 5px; width: 0; transition: width .3s; }
+  .meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--sub); }
+  .meta button { background: none; border: none; color: var(--side); font-size: 13px; padding: 0; text-decoration: underline; }
+  .since { font-size: 14px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .since b { font-size: 18px; }
+  .since.warn b { color: #c0392b; }
+  .cats, .mins { display: grid; gap: 8px; margin-bottom: 10px; }
+  .cats { grid-template-columns: repeat(3, 1fr); }
+  .mins { grid-template-columns: repeat(4, 1fr); }
+  .chip {
+    border: 1.5px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 10px; padding: 11px 4px; font-size: 14px; font-weight: 600; line-height: 1.3;
+  }
+  .chip small { display: block; font-size: 10px; font-weight: 400; color: var(--sub); }
+  .chip.on { color: #fff; border-color: transparent; }
+  .chip.on small { color: rgba(255,255,255,.8); }
+  .chip.on.side { background: var(--side); }
+  .chip.on.learn { background: var(--learn); }
+  .chip.on.other { background: var(--other); }
+  .chip.m.on { background: var(--text); color: var(--bg); }
+  .custom { display: flex; gap: 8px; }
+  .custom input {
+    flex: 1; border: 1.5px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 10px; padding: 11px; font-size: 16px; min-width: 0;
+  }
+  .add {
+    flex: 1.2; border: none; border-radius: 10px; background: var(--side); color: #fff;
+    font-size: 15px; font-weight: 700; padding: 11px;
+  }
+  .add:active { opacity: .8; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 9px 0; font-size: 14px; }
+  .row .nm { width: 86px; flex-shrink: 0; }
+  .row .bar { flex: 1; margin: 0; }
+  .row .v { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+  .log { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .log:first-of-type { border-top: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .log .t { color: var(--sub); font-size: 12px; width: 78px; flex-shrink: 0; }
+  .log .c { flex: 1; }
+  .log button { background: none; border: none; color: var(--sub); font-size: 18px; padding: 0 4px; }
+  .empty { color: var(--sub); font-size: 13px; text-align: center; padding: 8px 0; }
+  .foot { text-align: center; margin-top: 8px; }
+  .foot button { background: none; border: none; color: var(--sub); font-size: 12px; text-decoration: underline; padding: 6px 10px; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 20px; font-size: 13px;
+    opacity: 0; transition: .25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+
+<h1>時間ログ</h1>
+<div class="range" id="range"></div>
+
+<div class="card">
+  <h2>今週の副業</h2>
+  <div class="big"><span id="sideAct">0</span><small>/ <span id="sideGoal">120</span> 分</small></div>
+  <div class="bar"><i id="sideBar" style="background:var(--side)"></i></div>
+  <div class="meta"><span id="sidePct">0%</span><button id="goalBtn">目標を変更</button></div>
+  <div class="since" id="since"></div>
+</div>
+
+<div class="card">
+  <h2>記録する</h2>
+  <div class="cats" id="cats"></div>
+  <div class="mins" id="mins"></div>
+  <div class="custom">
+    <input id="custom" type="number" inputmode="numeric" min="1" max="600" placeholder="その他の分数">
+    <button class="add" id="addBtn">記録</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>今週のカテゴリ別</h2>
+  <div id="breakdown"></div>
+</div>
+
+<div class="card">
+  <h2>今週の記録</h2>
+  <div id="log"></div>
+</div>
+
+<div class="card">
+  <h2>バックアップ</h2>
+  <div class="custom">
+    <button class="chip" id="exportBtn" style="flex:1">エクスポート</button>
+    <button class="chip" id="importBtn" style="flex:1">インポート</button>
+  </div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CATS = [
+  { id: 'side',  name: '副業',   sub: '直結',   color: 'var(--side)' },
+  { id: 'learn', name: '学び',   sub: '気晴らし', color: 'var(--learn)' },
+  { id: 'other', name: 'その他', sub: '',       color: 'var(--other)' },
+];
+const MINS = [15, 30, 60, 90];
+const KEY = 'timelog.entries.v1', GKEY = 'timelog.goal.v1';
+
+function load(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+let entries = load(KEY, []);
+let goal = load(GKEY, 120);
+let selCat = 'side', selMin = 30;
+
+function weekStart(d = new Date()) {
+  const day = (d.getDay() + 6) % 7; // 月曜始まり
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+}
+function dayStart(ts) { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function fmtMD(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
+function fmtMin(m) {
+  if (m < 60) return m + '分';
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? h + '時間' + r + '分' : h + '時間';
+}
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+function render() {
+  const ws = weekStart(), we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6);
+  document.getElementById('range').textContent = fmtMD(ws) + ' 〜 ' + fmtMD(we) + '（月〜日）';
+
+  const week = entries.filter(e => e.ts >= ws.getTime() && e.ts < ws.getTime() + 7 * 86400000);
+  const sum = id => week.filter(e => e.cat === id).reduce((a, e) => a + e.min, 0);
+
+  // 副業カード
+  const sideAct = sum('side');
+  document.getElementById('sideAct').textContent = sideAct;
+  document.getElementById('sideGoal').textContent = goal;
+  const pct = Math.min(100, Math.round(sideAct / goal * 100));
+  document.getElementById('sideBar').style.width = pct + '%';
+  document.getElementById('sidePct').textContent = pct + '%';
+
+  // 最後に触れてから
+  const sides = entries.filter(e => e.cat === 'side');
+  const sinceEl = document.getElementById('since');
+  if (!sides.length) {
+    sinceEl.className = 'since'; sinceEl.textContent = 'まだ副業の記録がありません。まず15分から。';
+  } else {
+    const last = Math.max(...sides.map(e => e.ts));
+    const days = Math.round((dayStart(Date.now()) - dayStart(last)) / 86400000);
+    sinceEl.className = 'since' + (days >= 3 ? ' warn' : '');
+    sinceEl.innerHTML = days === 0 ? '今日、副業に触れました ✓'
+      : '最後に副業に触れてから <b>' + days + '日</b>';
+  }
+
+  // カテゴリ別
+  const total = CATS.reduce((a, c) => a + sum(c.id), 0);
+  document.getElementById('breakdown').innerHTML = CATS.map(c => {
+    const v = sum(c.id), w = total ? Math.round(v / total * 100) : 0;
+    return '<div class="row"><span class="nm">' + c.name + (c.sub ? '（' + c.sub + '）' : '') +
+      '</span><div class="bar"><i style="width:' + w + '%;background:' + c.color + '"></i></div>' +
+      '<span class="v">' + fmtMin(v) + '</span></div>';
+  }).join('');
+
+  // ログ
+  const logEl = document.getElementById('log');
+  if (!week.length) { logEl.innerHTML = '<div class="empty">まだ記録がありません</div>'; }
+  else {
+    logEl.innerHTML = week.slice().sort((a, b) => b.ts - a.ts).map(e => {
+      const c = CATS.find(x => x.id === e.cat), d = new Date(e.ts);
+      const hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      return '<div class="log"><span class="dot" style="background:' + c.color + '"></span>' +
+        '<span class="t">' + fmtMD(d) + ' ' + hh + '</span>' +
+        '<span class="c">' + c.name + ' ' + fmtMin(e.min) + '</span>' +
+        '<button data-id="' + e.id + '" aria-label="削除">×</button></div>';
+    }).join('');
+  }
+}
+
+function renderInputs() {
+  document.getElementById('cats').innerHTML = CATS.map(c =>
+    '<button class="chip ' + c.id + (selCat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' +
+    c.name + (c.sub ? '<small>' + c.sub + '</small>' : '<small>&nbsp;</small>') + '</button>').join('');
+  document.getElementById('mins').innerHTML = MINS.map(m =>
+    '<button class="chip m' + (selMin === m ? ' on' : '') + '" data-min="' + m + '">' + m + '分</button>').join('');
+}
+
+document.getElementById('cats').addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]'); if (!b) return;
+  selCat = b.dataset.cat; renderInputs();
+});
+document.getElementById('mins').addEventListener('click', e => {
+  const b = e.target.closest('[data-min]'); if (!b) return;
+  selMin = +b.dataset.min; document.getElementById('custom').value = ''; renderInputs();
+});
+document.getElementById('custom').addEventListener('input', e => {
+  if (e.target.value) { selMin = null; renderInputs(); }
+});
+document.getElementById('addBtn').addEventListener('click', () => {
+  const cv = parseInt(document.getElementById('custom').value, 10);
+  const min = cv > 0 ? cv : selMin;
+  if (!min) { toast('分数を選んでください'); return; }
+  entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), cat: selCat, min: Math.min(min, 600) });
+  save(KEY, entries);
+  document.getElementById('custom').value = '';
+  if (!selMin) selMin = 30;
+  renderInputs(); render();
+  toast(CATS.find(c => c.id === selCat).name + ' ' + fmtMin(Math.min(min, 600)) + ' 記録しました');
+});
+document.getElementById('log').addEventListener('click', e => {
+  const b = e.target.closest('[data-id]'); if (!b) return;
+  if (!confirm('この記録を削除しますか？')) return;
+  entries = entries.filter(x => x.id !== b.dataset.id); save(KEY, entries); render();
+});
+document.getElementById('goalBtn').addEventListener('click', () => {
+  const v = parseInt(prompt('今週の副業の目標時間（分）', goal), 10);
+  if (v > 0) { goal = v; save(GKEY, goal); render(); }
+});
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const text = JSON.stringify({ app: 'timelog', version: 1, goal, entries }, null, 1);
+  const d = new Date();
+  const name = 'timelog-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.json';
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('エクスポートしました');
+});
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const valid = (Array.isArray(data.entries) ? data.entries : []).filter(x =>
+      x && typeof x.id === 'string' && Number.isFinite(x.ts) && Number.isFinite(x.min) && x.min > 0 &&
+      CATS.some(c => c.id === x.cat));
+    if (!valid.length && !(data.goal > 0)) { toast('読み込めるデータがありません'); return; }
+    const have = new Set(entries.map(x => x.id));
+    const fresh = valid.filter(x => !have.has(x.id));
+    if (!confirm(fresh.length + '件の記録を取り込みます（重複は除外）。よろしいですか？')) return;
+    entries = entries.concat(fresh.map(x => ({ id: x.id, ts: x.ts, cat: x.cat, min: x.min })));
+    if (data.goal > 0) goal = Math.round(data.goal);
+    save(KEY, entries); save(GKEY, goal); render();
+    toast(fresh.length + '件を取り込みました');
+  } catch (err) { toast('ファイルを読み込めませんでした'); }
+});
+
+renderInputs(); render();
+</script>
+</body>
+</html>
